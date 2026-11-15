@@ -1,0 +1,29 @@
+@model LocalUser[]
+@{ Layout = "_AccountLayout"; ViewData["Title"] = "用户管理"; var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier); }
+<div class="page-heading"><div><div class="eyebrow">WORKSPACE ACCOUNTS</div><h1>管理工作台的用户。</h1><p>创建内置账户，分配角色，或调整用户的登录权限。</p></div></div>
+<div class="users-grid">
+<section class="panel"><h2>新建用户</h2><form method="post" action="/account/users">@Html.AntiForgeryToken()
+<label class="form-field"><span>用户名</span><input name="UserName" required pattern="[A-Za-z0-9_.-]{3,32}" minlength="3" maxlength="32"><small>3–32 个字母、数字、点、下划线或短横线</small></label>
+<label class="form-field"><span>显示名称</span><input name="DisplayName" required maxlength="60"></label>
+<label class="form-field"><span>初始密码</span><input type="password" name="Password" required minlength="12" maxlength="128" autocomplete="new-password"></label>
+<label class="form-field"><span>角色</span><select name="Role"><option value="User">普通用户</option><option value="Admin">管理员</option></select></label>
+<button class="btn primary" type="submit">创建用户</button>
+</form><p class="account-hint">普通用户可浏览资源和管理下载。管理员还可管理内置账户。所有用户使用同一份资源库、下载队列和目录设置。</p></section>
+<section class="panel"><h2>内置账户 <small class="muted">@Model.Length 个</small></h2>
+<div class="user-list">
+@foreach (var user in Model)
+{
+<article class="user-card">
+<div class="user-title"><div><strong>@user.DisplayName</strong><p class="muted">@user.UserName · @(user.Role == "Admin" ? "管理员" : "普通用户")</p></div><span class="status-pill">@(user.Disabled ? "已停用" : user.LockedUntil > DateTimeOffset.UtcNow ? "暂时锁定" : "可登录")</span></div>
+@if (user.Id == actorId) { <p class="muted">当前账户 · <a class="resource-link" href="/account/password">修改自己的密码</a></p> }
+else
+{
+<form method="post" action="/account/users/@user.Id/password" class="reset-form">@Html.AntiForgeryToken()
+<label class="form-field"><span>重置密码</span><input type="password" name="password" required minlength="12" maxlength="128" autocomplete="new-password" placeholder="输入新密码（至少 12 位）"></label>
+<button class="btn small" type="submit">重置密码</button></form>
+<form method="post" action="/account/users/@user.Id/status">@Html.AntiForgeryToken()<input type="hidden" name="disabled" value="@(!user.Disabled ? "true" : "false")"><button type="submit" class="btn small">@(user.Disabled ? "启用账户" : "停用账户")</button></form>
+}
+</article>
+}
+</div></section>
+</div>

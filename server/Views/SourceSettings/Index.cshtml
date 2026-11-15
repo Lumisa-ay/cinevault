@@ -1,0 +1,67 @@
+@model SourceConfigurationView
+@{ Layout = "_AccountLayout"; ViewData["Title"] = "来源与密钥"; }
+<link rel="stylesheet" href="/source-settings.css">
+<div class="page-heading"><div><div class="eyebrow">SOURCE CONNECTIONS</div><h1>把电影来源，连接起来。</h1><p>管理员设置 TMDB 与 IMDb 接入方式。保存后立即生效，无需重启容器。</p></div><a class="btn" href="/#sources">开始检索</a></div>
+<div class="notice"><span>凭据在服务器加密保存。密钥输入框始终为空；留空保留已保存的凭据，填写新值则替换。测试只使用已保存的配置。</span></div>
+<div class="source-config-grid">
+<section class="panel source-config-card"><div class="source-config-title"><h2>TMDB</h2><span class="status-pill">@(Model.HasTmdbCredential ? "已配置" : "未配置")</span></div>
+<p class="muted">支持 API Key（v3）或 API Read Access Token。请选择与 TMDB 账户页面一致的凭据类型。</p>
+<form method="post" action="/admin/sources/tmdb">@Html.AntiForgeryToken()
+<label class="form-field"><span>凭据类型</span><select name="CredentialType"><option value="api_key" selected="@(Model.TmdbType == "api_key")">API Key（v3）</option><option value="bearer" selected="@(Model.TmdbType == "bearer")">API Read Access Token（Bearer）</option></select></label>
+<label class="form-field"><span>密钥 / Token · @(Model.HasTmdbCredential ? "已保存" : "尚未保存")</span><input name="Credential" type="password" maxlength="8192" autocomplete="new-password" placeholder="粘贴新密钥；留空保留原值" spellcheck="false"><small>@(Model.TmdbFromEnvironment ? "当前使用服务器环境变量；网页保存后优先使用网页配置。" : "密钥不会回填到页面。更换凭据类型时请同时填写新值。")</small></label>
+<label class="source-clear"><input type="checkbox" name="ClearCredential" value="true">清除已保存的 TMDB 密钥并停用</label>
+<button class="btn primary" type="submit">保存 TMDB 配置</button></form>
+<form class="source-test" method="post" action="/admin/sources/test/tmdb">@Html.AntiForgeryToken()<button class="btn" type="submit">测试已保存的 TMDB 连接</button></form>
+<a class="resource-link" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">打开 TMDB API 设置 ↗</a>
+</section>
+<section class="panel source-config-card"><div class="source-config-title"><h2>IMDb</h2><span class="status-pill">@(Model.ImdbMode == "official" ? (Model.OfficialReady ? "官方 API 已配置" : "官方凭据待补全") : Model.ImdbMode == "omdb" ? (Model.HasOmdbApiKey ? "OMDb 密钥已配置" : "OMDb 待配置") : "本地数据集模式")</span></div>
+<p class="muted">不同平台签发的密钥不可混用。官方 IMDb API 需要 AWS Data Exchange 订阅；OMDb 是提供 IMDb 评分的第三方接口。</p>
+<form method="post" action="/admin/sources/imdb">@Html.AntiForgeryToken()
+<label class="form-field"><span>接入方式</span><select id="imdb-mode" name="Mode"><option value="dataset" selected="@(Model.ImdbMode == "dataset")">官方本地数据集（无需密钥）</option><option value="official" selected="@(Model.ImdbMode == "official")">IMDb 官方 API（AWS Data Exchange）</option><option value="omdb" selected="@(Model.ImdbMode == "omdb")">OMDb API（第三方）</option></select></label>
+<div data-imdb-mode="dataset" hidden="@(Model.ImdbMode != "dataset")"><p class="account-hint">保留现有数据集检索。将 title.basics.tsv.gz 和 title.ratings.tsv.gz 放入 /data/imdb；使用英文或原文片名查询。官方非商业数据集无需密钥。</p><a class="resource-link" href="https://data.imdb.com/non-commercial-datasets/" target="_blank" rel="noopener noreferrer">官方数据集说明 ↗</a></div>
+<div data-imdb-mode="official" hidden="@(Model.ImdbMode != "official")">
+<div class="notice warning"><span>当前官方 API 适配按 IMDb 编号（如 tt0133093）查询片名及评分；不查询年份与类别。查询时请选择「全部」类别。按片名查找请使用本地数据集或 OMDb。连接测试会发送一次资料查询。</span></div>
+<label class="form-field"><span>IMDb API Key · @(Model.HasImdbApiKey ? "已保存" : "未配置")</span><input name="ApiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="IMDb 签发的 API Key" spellcheck="false"></label>
+<div class="source-aws-grid">
+<label class="form-field"><span>AWS Access Key ID · @(Model.HasAwsAccessKeyId ? "已保存" : "未配置")</span><input name="AwsAccessKeyId" type="password" maxlength="8192" autocomplete="new-password" spellcheck="false"></label>
+<label class="form-field"><span>AWS Secret Access Key · @(Model.HasAwsSecretAccessKey ? "已保存" : "未配置")</span><input name="AwsSecretAccessKey" type="password" maxlength="8192" autocomplete="new-password" spellcheck="false"></label>
+</div>
+<label class="form-field"><span>AWS Session Token（临时凭据时填写）· @(Model.HasAwsSessionToken ? "已保存" : "未配置")</span><input name="AwsSessionToken" type="password" maxlength="8192" autocomplete="new-password" spellcheck="false"></label>
+<label class="source-clear"><input type="checkbox" name="ClearSessionToken" value="true">清除旧的 Session Token（切换长期 AWS 凭据时）</label>
+<div class="source-aws-grid">
+<label class="form-field"><span>Data Set ID</span><input name="DataSetId" maxlength="128" value="@Model.DataSetId" spellcheck="false"></label>
+<label class="form-field"><span>Revision ID</span><input name="RevisionId" maxlength="128" value="@Model.RevisionId" spellcheck="false"></label>
+</div><label class="form-field"><span>Asset ID</span><input name="AssetId" maxlength="128" value="@Model.AssetId" spellcheck="false"></label>
+<p class="account-hint">使用订阅该 IMDb 产品的 AWS 账户凭据。区域固定为官方入口 us-east-1，接口地址由系统固定设置。</p>
+<a class="resource-link" href="https://data.imdb.com/documentation/api-documentation/calling-the-api/" target="_blank" rel="noopener noreferrer">IMDb 官方调用与订阅说明 ↗</a>
+</div>
+<div data-imdb-mode="omdb" hidden="@(Model.ImdbMode != "omdb")">
+<label class="form-field"><span>OMDb API Key · @(Model.HasOmdbApiKey ? "已保存" : "未配置")</span><input name="OmdbApiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="由 omdbapi.com 签发的 Key" spellcheck="false"></label>
+<p class="account-hint">支持按英文片名或 IMDb 编号查询。结果明确标注「IMDb（由 OMDb 提供）」。每页最多 10 项，补查评分时会请求影片详情并使用账户额度。</p>
+<a class="resource-link" href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer">打开 OMDb 密钥页面 ↗</a>
+</div>
+<label class="source-clear"><input type="checkbox" name="ClearCredentials" value="true">清除 IMDb / OMDb 已保存的全部在线凭据</label>
+<button class="btn primary" type="submit">保存 IMDb 配置</button></form>
+<form class="source-test" method="post" action="/admin/sources/test/imdb">@Html.AntiForgeryToken()<button class="btn" type="submit">测试已保存的 IMDb 配置</button></form>
+</section>
+</div>
+<section class="panel source-config-card" style="margin-top:24px">
+<h2>磁力资源索引与 BT 下载器</h2>
+<p class="muted">Prowlarr 查询你已启用的网上资源索引，qBittorrent 执行磁力下载。优先识别 4K / 2160p 和 CHS / CHT / 中字；这些标签来自资源名称，尚未验证文件内字幕。</p>
+<form method="post" action="/admin/sources/bt">@Html.AntiForgeryToken()
+<div class="source-aws-grid"><div>
+<label class="form-field"><span>Prowlarr 服务地址</span><input name="ResourceIndexUrl" type="url" value="@Model.ResourceIndexUrl" placeholder="http://prowlarr:9696/" maxlength="512"><small>填写电影服务容器可以访问的地址；已安装在宿主机上时可使用 host.docker.internal。</small></label>
+<label class="form-field"><span>Prowlarr API Key · @(Model.HasResourceIndexKey ? "已保存" : "未配置")</span><input name="ResourceIndexKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="留空保留已有 Key"><small>在 Prowlarr 的设置 → 常规查看 API Key，并先添加、启用可用索引。</small></label>
+<label class="source-clear"><input type="checkbox" name="ClearResourceIndexKey" value="true">清除资源索引密钥</label>
+</div><div>
+<label class="form-field"><span>qBittorrent Web UI 地址</span><input name="QbitUrl" type="url" value="@Model.QbitUrl" placeholder="http://qbittorrent:8080/" maxlength="512"></label>
+<label class="form-field"><span>Web UI 用户名</span><input name="QbitUserName" value="@Model.QbitUserName" maxlength="120" autocomplete="username"></label>
+<label class="form-field"><span>Web UI 密码 · @(Model.HasQbitPassword ? "已保存" : "未配置")</span><input name="QbitPassword" type="password" maxlength="512" autocomplete="new-password" placeholder="留空保留已有密码"></label>
+<label class="form-field"><span>下载器的保存根目录</span><input name="QbitSaveRoot" value="@Model.QbitSaveRoot" required maxlength="500"><small>配套 Docker 服务使用 /downloads，映射到与本系统相同的宿主机下载目录。</small></label>
+<label class="source-clear"><input type="checkbox" name="ClearQbitPassword" value="true">清除下载器密码</label>
+</div></div><button class="btn primary" type="submit">保存资源与下载器配置</button>
+</form>
+<div class="source-aws-grid"><form class="source-test" method="post" action="/admin/sources/test/indexer">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 Prowlarr 索引</button></form><form class="source-test" method="post" action="/admin/sources/test/qbittorrent">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 qBittorrent</button></form></div>
+<p class="account-hint">批量操作每次最多检查 3 部最新电影；只自动提交片名、年份匹配，标有 4K 与中文字幕，且报告有做种者的候选。未匹配到的影片会跳过并显示原因。取消 BT 任务保留已下载的文件。</p>
+</section>
+<script type="module" src="/source-settings.js"></script>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <CineVaultFramework Condition="'$(CineVaultFramework)' == ''">net10.0</CineVaultFramework>
+    <TargetFramework>$(CineVaultFramework)</TargetFramework>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../server/CineVault.csproj" /></ItemGroup>
+</Project>

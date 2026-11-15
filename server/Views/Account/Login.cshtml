@@ -1,0 +1,16 @@
+@model LoginInput
+@{ Layout = "_AccountLayout"; ViewData["Title"] = "登录"; }
+<section class="login-card">
+<div class="eyebrow">WELCOME TO YOUR COLLECTION</div>
+<h1>欢迎回到映库。</h1><p class="muted">使用系统内置账户登录，继续管理你的收藏。</p>
+@if (Context.Request.Query["changed"] == "1") { <div class="notice">密码已修改，请使用新密码登录。</div> }
+<form method="post" action="/account/login">
+@Html.AntiForgeryToken()
+<input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl">
+<div asp-validation-summary="All" class="form-error" role="alert"></div>
+<label class="form-field"><span>用户名</span><input name="UserName" value="@Model.UserName" autocomplete="username" maxlength="32" required autofocus placeholder="输入用户名"></label>
+<label class="form-field"><span>密码</span><input type="password" name="Password" autocomplete="current-password" maxlength="128" required placeholder="输入密码"></label>
+<button class="btn primary login-submit" type="submit">登录工作台 →</button>
+</form>
+<p class="account-hint">首次使用请联系管理员获取账户。连续 5 次密码错误后，账户将锁定 15 分钟。</p>
+</section>

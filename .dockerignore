@@ -1,0 +1,13 @@
+.git
+.openai
+.runtime
+.secrets
+.env
+**/bin
+**/obj
+**/App_Data
+downloads
+artifacts
+tests
+node_modules
+.docker

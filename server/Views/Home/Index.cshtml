@@ -1,0 +1,15 @@
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Antiforgery
+@inject IAntiforgery Antiforgery
+@{
+    Layout = null;
+    var token = HtmlEncoder.Default.Encode(Antiforgery.GetAndStoreTokens(Context).RequestToken!);
+    var display = HtmlEncoder.Default.Encode(User.FindFirst("display_name")?.Value ?? User.Identity?.Name ?? "");
+    var html = System.IO.File.ReadAllText(System.IO.Path.Combine((string)Context.Items["UiRoot"]!, "index.html"));
+    html = html.Replace("</head>", "<meta name=\"cinevault-server\" content=\"1\"><meta name=\"csrf-token\" content=\"" + token + "\"><link rel=\"stylesheet\" href=\"/account.css\"></head>");
+    html = html.Replace("<span class=\"avatar small\">A</span>",
+        "<a class=\"account-link\" href=\"/account/password\">" + display + "</a><form method=\"post\" action=\"/account/logout\"><input type=\"hidden\" name=\"__RequestVerificationToken\" value=\"" + token + "\"><button class=\"btn small\" type=\"submit\">退出</button></form>");
+    if (User.IsInRole("Admin"))
+        html = html.Replace("<div class=\"nav-divider\"></div>", "<a href=\"/admin/sources\">来源与密钥</a><a href=\"/account/users\">用户管理</a><div class=\"nav-divider\"></div>");
+}
+@Html.Raw(html)

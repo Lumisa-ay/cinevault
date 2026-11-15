@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>@ViewData["Title"] · 映库</title>
+<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/account.css">
+</head>
+<body class="account-page">
+<header class="account-header"><a class="brand" href="/"><span class="brand-mark">映</span><span>映库<small>CINEVAULT</small></span></a>
+@if (User.Identity?.IsAuthenticated == true)
+{
+<nav class="account-nav" aria-label="账户导航"><a href="/">返回工作台</a><a href="/account/password">修改密码</a>
+@if (User.IsInRole("Admin")) { <a href="/admin/sources">来源与密钥</a><a href="/account/users">用户管理</a> }
+<form method="post" action="/account/logout">@Html.AntiForgeryToken()<button class="btn small" type="submit">退出登录</button></form></nav>
+}
+</header>
+<main class="account-main">
+@if (TempData["Error"] is string error) { <div class="notice warning" role="alert">@error</div> }
+@if (TempData["Message"] is string message) { <div class="notice" role="status">@message</div> }
+@RenderBody()
+</main>
+<footer class="account-footer">映库 CineVault · 本地账户 · 私人影视工作台</footer>
+</body></html>

@@ -1,0 +1,78 @@
+name: cinevault
+services:
+  web:
+    image: cinevault:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CINEVAULT_PORT:-5188}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      AllowedHosts: localhost;127.0.0.1;[::1]
+      LocalOnly: "false"
+      DataDirectory: /data
+      DownloadDirectory: /downloads
+      AllowedDownloadRoots__0: /downloads
+      Crawler__RespectRobotsTxt: "${CINEVAULT_RESPECT_ROBOTS:-false}"
+      Network__SourceProxy: ${CINEVAULT_SOURCE_PROXY-http://http.docker.internal:3128}
+      Network__ProxyHosts__0: www.gying.net
+      Network__ProxyHosts__1: gying.net
+      Network__ProxyHosts__2: archive.org
+      Network__ProxyHosts__3: api.themoviedb.org
+      Network__ProxyHosts__4: www.omdbapi.com
+      Network__ProxyHosts__5: api-fulfill.dataexchange.us-east-1.amazonaws.com
+      Sources__TmdbApiKey: ${CINEVAULT_TMDB_API_KEY:-}
+      Sources__ImdbDirectory: /data/imdb
+      Sources__JustWatchRegion: ${CINEVAULT_JUSTWATCH_REGION:-jp}
+      Bootstrap__AdminUser: admin
+      Bootstrap__AdminPasswordFile: /run/secrets/admin_password
+    secrets:
+      - admin_password
+    volumes:
+      - cinevault-data:/data
+      - type: bind
+        source: ${CINEVAULT_DOWNLOADS_PATH:-./downloads}
+        target: /downloads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 40s
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    profiles: [bt]
+    restart: unless-stopped
+    environment:
+      PUID: "1654"
+      PGID: "1654"
+      TZ: Asia/Shanghai
+      WEBUI_PORT: "8080"
+    ports:
+      - "127.0.0.1:${CINEVAULT_QBIT_PORT:-8081}:8080"
+    volumes:
+      - cinevault-qbit:/config
+      - type: bind
+        source: ${CINEVAULT_DOWNLOADS_PATH:-./downloads}
+        target: /downloads
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    profiles: [bt]
+    restart: unless-stopped
+    environment:
+      PUID: "1654"
+      PGID: "1654"
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${CINEVAULT_PROWLARR_PORT:-9696}:9696"
+    volumes:
+      - cinevault-prowlarr:/config
+volumes:
+  cinevault-data:
+  cinevault-qbit:
+  cinevault-prowlarr:
+secrets:
+  admin_password:
+    file: ./.secrets/admin-password.txt

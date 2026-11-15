@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/App_Data/
+.runtime/
+.openai/
+*.user
+*.log
+node_modules/
+artifacts/
+
+.secrets/
+.env
+downloads/
+NVIDIA Corporation/
+.docker/
