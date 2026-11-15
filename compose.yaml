@@ -24,6 +24,7 @@ services:
       Network__ProxyHosts__3: api.themoviedb.org
       Network__ProxyHosts__4: www.omdbapi.com
       Network__ProxyHosts__5: api-fulfill.dataexchange.us-east-1.amazonaws.com
+      Network__ProxyHosts__6: api.knaben.org
       Sources__TmdbApiKey: ${CINEVAULT_TMDB_API_KEY:-}
       Sources__ImdbDirectory: /data/imdb
       Sources__JustWatchRegion: ${CINEVAULT_JUSTWATCH_REGION:-jp}
@@ -59,7 +60,7 @@ services:
         target: /downloads
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
-    profiles: [bt]
+    profiles: [legacy-prowlarr]
     restart: unless-stopped
     environment:
       PUID: "1654"

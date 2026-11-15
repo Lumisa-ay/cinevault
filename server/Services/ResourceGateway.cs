@@ -11,12 +11,12 @@ public interface IResourceGateway
     Task Control(string hash, string action, CancellationToken ct);
     Task<SourceConnectionResult> Test(string provider, CancellationToken ct);
 }
-public sealed class ResourceGateway(SourceSettingsStore settings, HttpMessageHandler? fixtureHandler = null) : IResourceGateway
+public sealed class ResourceGateway(SourceSettingsStore settings, IPublicWebClient web, HttpMessageHandler? fixtureHandler = null) : IResourceGateway
 {
     private HttpClient Client(string url)
     {
         var root = SourceSettingsStore.ServiceUrl(url);
-        if (root.Length == 0) throw new ArgumentException("请管理员先在“来源与密钥”配置资源索引与 qBittorrent。");
+        if (root.Length == 0) throw new ArgumentException("请管理员先在“来源与密钥”配置 qBittorrent。");
         return new HttpClient(fixtureHandler ?? new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false }, fixtureHandler is null) { BaseAddress = new Uri(root), Timeout = TimeSpan.FromSeconds(15) };
     }
     private static string Text(JsonElement item, string key) => item.TryGetProperty(key, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined) ? value.ToString() : "";
@@ -25,27 +25,40 @@ public sealed class ResourceGateway(SourceSettingsStore settings, HttpMessageHan
     { using var response = await client.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, ct); return await SourceApiClient.ReadJson(response, ct); }
     public async Task<TorrentCandidate[]> Search(MediaItem movie, CancellationToken ct)
     {
-        var c = settings.Current;
-        if (c.ResourceIndexKey.Length == 0) throw new ArgumentException("尚未配置 Prowlarr API Key。请先添加你可使用的资源索引。");
-        using var client = Client(c.ResourceIndexUrl); client.DefaultRequestHeaders.Add("X-Api-Key", c.ResourceIndexKey);
         var queries = new[] { movie.OriginalTitle, movie.Title }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Take(2);
         var candidates = new List<TorrentCandidate>();
         foreach (var query in queries)
         {
-            using var doc = await Get(client, "api/v1/search?query=" + Uri.EscapeDataString(query + (movie.Year > 0 ? " " + movie.Year : "")) + "&type=search", ct);
-            if (doc.RootElement.ValueKind != JsonValueKind.Array) throw new InvalidDataException("资源索引未返回有效结果。");
-            foreach (var row in doc.RootElement.EnumerateArray().Take(200))
+            using var doc = await SearchKnaben(query + (movie.Year > 0 ? " " + movie.Year : ""), ct);
+            foreach (var row in doc.RootElement.GetProperty("hits").EnumerateArray().Take(150))
             {
                 if (row.ValueKind != JsonValueKind.Object) continue;
-                if (Text(row, "protocol").Equals("usenet", StringComparison.OrdinalIgnoreCase)) continue;
-                var title = Text(row, "title"); var magnet = Text(row, "magnetUrl"); var hash = Text(row, "infoHash");
+                var title = Text(row, "title"); var magnet = Text(row, "magnetUrl"); var hash = Text(row, "hash");
+                if (string.IsNullOrWhiteSpace(title)) continue;
                 if (magnet.Length == 0 && hash.Length > 0) magnet = "magnet:?xt=urn:btih:" + hash + "&dn=" + Uri.EscapeDataString(title);
-                try { candidates.Add(TorrentReleaseRules.Candidate(movie, title, magnet, (int)Math.Clamp(Number(row, "seeders"), 0, int.MaxValue), Number(row, "size"), Text(row, "indexer"))); }
+                try { candidates.Add(TorrentReleaseRules.Candidate(movie, title, magnet, (int)Math.Clamp(Number(row, "seeders"), 0, int.MaxValue), Math.Max(0, Number(row, "bytes")), "Knaben / " + Text(row, "tracker"))); }
                 catch (ArgumentException) { }
             }
             if (candidates.Any(x => x.MatchesMovie)) break;
         }
         return candidates.DistinctBy(x => x.InfoHash).OrderByDescending(x => x.Rank).Take(30).ToArray();
+    }
+    private async Task<JsonDocument> SearchKnaben(string query, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(18));
+        var url = "https://api.knaben.org/v2/search?q=" + Uri.EscapeDataString(query) + "&sf=title&o=seeders&d=desc&s=150&dead";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        try
+        {
+            using var response = await web.SendApiAsync(request, timeout.Token);
+            var doc = await SourceApiClient.ReadJson(response, timeout.Token);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("hits", out var hits) || hits.ValueKind != JsonValueKind.Array)
+            { doc.Dispose(); throw new InvalidDataException("资源引擎返回的数据格式无效。"); }
+            return doc;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { throw new HttpRequestException("资源引擎请求超时。"); }
     }
     private async Task<HttpClient> Qbit(CancellationToken ct)
     {
@@ -110,12 +123,8 @@ public sealed class ResourceGateway(SourceSettingsStore settings, HttpMessageHan
             if (provider == "qbittorrent") { using var client = await Qbit(ct); using var response = await client.GetAsync("api/v2/app/version", ct); response.EnsureSuccessStatusCode(); }
             else if (provider == "indexer")
             {
-                var c = settings.Current;
-                if (c.ResourceIndexKey.Length == 0) return new(false, "请先保存 Prowlarr API Key。");
-                using var client = Client(c.ResourceIndexUrl); client.DefaultRequestHeaders.Add("X-Api-Key", c.ResourceIndexKey);
-                using var doc = await Get(client, "api/v1/indexer", ct);
-                if (doc.RootElement.ValueKind != JsonValueKind.Array || !doc.RootElement.EnumerateArray().Any(x => Text(x, "enable").Equals("true", StringComparison.OrdinalIgnoreCase)))
-                    return new(false, "Prowlarr 已连接，但没有启用的资源索引，请先在 Prowlarr 中添加可用索引。");
+                using var doc = await SearchKnaben("Debian Linux ISO", ct);
+                return new(true, "Knaben 资源引擎连接成功。");
             }
             else return new(false, "未知服务。");
             return new(true, "服务连接测试成功。");

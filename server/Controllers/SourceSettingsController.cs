@@ -40,7 +40,7 @@ public sealed class SourceSettingsController(SourceSettingsStore settings, Movie
     public IActionResult Bt(BtSettingsInput input)
     {
         if (!ModelState.IsValid) { TempData["Error"] = "请完整填写 BT 配置。"; return RedirectToAction(nameof(Index)); }
-        try { settings.SaveBt(input); TempData["Message"] = "资源索引和下载器配置已加密保存，立即生效。"; }
+        try { settings.SaveBt(input); TempData["Message"] = "下载器配置已加密保存，立即生效。"; }
         catch (ArgumentException ex) { TempData["Error"] = ex.Message; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { TempData["Error"] = "配置无法写入，原配置保留。"; }
         return RedirectToAction(nameof(Index));

@@ -15,7 +15,7 @@ public sealed class TorrentService(StateStore store, SourceSettingsStore setting
             (x.Is4K ? "4K" : "其他画质") + (x.HasChineseSubtitles ? " · 中字（名称标注）" : " · 字幕未知") + (!x.MatchesMovie ? " · 片名/年份待核对" : ""), "MAGNET", Math.Round(x.Size / 1073741824d, 2) + " GB")).ToArray();
         var updated = movie with { Resources = movie.Resources.Where(x => x.Protocol != "MAGNET").Concat(links).ToArray(), Qualities = movie.Qualities.Concat(candidates.Any(x => x.Is4K) ? new[] { "4K" } : Array.Empty<string>()).Distinct().ToArray() };
         store.MergeMedia([updated]);
-        return new(updated, candidates, ["画质与字幕根据资源名称识别，尚未检查实际文件；请核对原片名和年份。"]);
+        return new(updated, candidates, ["画质与字幕根据资源名称识别，尚未检查实际文件；做种数来自索引记录，可能不准确或过期，请核对原片名和年份。"]);
     }
     public DownloadJob Create(CreateDownload request)
     {

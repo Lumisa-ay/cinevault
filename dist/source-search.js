@@ -24,7 +24,7 @@ export function sourceSearchView(heading,live){
  <label class="source-unrated"><input name="includeUnrated" type="checkbox" ${s.includeUnrated?'checked':''}>同时显示暂无评分的内容</label>
  <button class="btn primary" type="submit" ${s.busy||s.batchBusy||!live?'disabled':''}>${s.busy?'正在检索…':'检索来源'}</button>
  </form>
- <div class="notice"><span>磁力检索需管理员配置 Prowlarr 与 qBittorrent。评分按来源独立显示。TMDB / 豆瓣 / IMDb 提供影片资料，JustWatch 查询观看平台；这些资料页本身不提供影片文件。${!live?' 请运行本地 MVC 服务使用站内检索。':''}</span></div>
+ <div class="notice"><span>磁力检索使用 Knaben 在线索引，无需索引密钥；下载需管理员配置 qBittorrent。评分按来源独立显示。TMDB / 豆瓣 / IMDb 提供影片资料，JustWatch 查询观看平台；这些资料页本身不提供影片文件。${!live?' 请运行本地 MVC 服务使用站内检索。':''}</span></div>
  ${s.error?`<div class="notice warning" role="alert">${esc(s.error)}</div>`:''}
  <div class="source-status-grid">${s.sources.map(source=>`<article class="source-status-card"><div><strong>${esc(source.name)}</strong><span class="source-badge ${source.status==='error'?'failed':''}">${esc(labels[source.status]||source.status)}</span></div><p>${esc(source.message)}</p>${source.status==='ok'?`<small>本页匹配 ${source.count} 项</small>`:''}<a class="resource-link" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">打开 ${esc(source.name)} 网页 ↗</a></article>`).join('')}</div>
  </section>

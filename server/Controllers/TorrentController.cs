@@ -15,15 +15,15 @@ public sealed class TorrentController(TorrentService torrents, MovieSearchServic
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(40));
         try { return await torrents.Find(id, timeout.Token); }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or IOException or InvalidDataException or InvalidOperationException)
-        { throw new ArgumentException("资源索引查询失败，请检查 Prowlarr 服务、已启用的索引与 API Key。"); }
+        { throw new ArgumentException("资源引擎查询失败，请检查 Knaben 网络连接或稍后重试。"); }
     }
     [HttpPost("sync/latest/download")]
     public async Task<object> Sync(LatestDownloadRequest request, CancellationToken ct)
     {
         if (request.Limit is < 1 or > 3) throw new ArgumentException("每次批量下载最多检查 3 部电影。");
         var c = settings.Current;
-        if (c.ResourceIndexUrl.Length == 0 || c.ResourceIndexKey.Length == 0 || c.QbitUrl.Length == 0 || c.QbitPassword.Length == 0)
-            throw new ArgumentException("请先在“来源与密钥”配置可用的 Prowlarr 索引和 qBittorrent。");
+        if (c.QbitUrl.Length == 0 || c.QbitPassword.Length == 0)
+            throw new ArgumentException("请先在“来源与密钥”配置 qBittorrent。");
         if (!await BatchGate.WaitAsync(0, ct)) throw new ArgumentException("已有批量匹配任务正在执行，请稍后重试。");
         try
         {

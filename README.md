@@ -8,23 +8,22 @@
 
 TMDB 配置成功后，进入「多来源检索」会首次自动同步最新电影；资源库为空时，首页也会加载这一页。点击「同步最新电影」可重新查询。电影按首映日期倒序显示，排除未来首映日期；日期上限按北京时间计算。数据通过官方 Discover API 获取，合并到现有持久资源库，不清除已有任务和资源。最低评分可设为 0 查看未评分的新电影。连接测试现在同时检查认证配置和实际电影查询。
 
-磁力检索使用 **Prowlarr 已配置并启用的网上资源索引**，下载使用 **qBittorrent Web UI API**。系统没有内置一个可保证找到所有电影的磁力站点；需先在 Prowlarr 添加可用索引。仅提供片名资料的 TMDB 不能代替资源索引。
+磁力检索直接使用 **Knaben 公共在线索引 API**，无需部署 Prowlarr、配置索引器或填写索引 API Key；下载仍使用 **qBittorrent Web UI API**。搜索会将电影名称和年份发送到 Knaben。资源是否存在、索引数据是否准确以及网络连通性由第三方服务决定；TMDB 只提供电影资料。
 
-如果还没有这两个服务，可在项目根目录运行以下脚本，构建本系统并启动配套服务：
+如果还没有 qBittorrent，可在项目根目录运行以下脚本，构建本系统并启动配套服务：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\update-local.ps1 -EnableBt
 ```
 
-以上命令从包含 `compose.yaml` 的项目目录运行；从外层「资源下载」工作区运行时，脚本路径为 `.\sites\cinevault\scripts\update-local.ps1`。已有 Prowlarr / qBittorrent 可直接接入，使用不带 `-EnableBt` 的更新命令即可。配套服务的 Web UI 仅绑定本机地址，BT 不额外发布入站宿主机端口，默认使用出站连接发现和连接可用节点。
+以上命令从包含 `compose.yaml` 的项目目录运行；从外层「资源下载」工作区运行时，脚本路径为 `.\sites\cinevault\scripts\update-local.ps1`。已有 qBittorrent 可直接接入，使用不带 `-EnableBt` 的更新命令即可。配套服务的 Web UI 仅绑定本机地址，BT 不额外发布入站宿主机端口，默认使用出站连接发现和连接可用节点。旧 Prowlarr 服务和数据不会自动删除。
 
 | 服务 | 浏览器访问地址 | 映库中的服务地址 |
 | --- | --- | --- |
 | 映库 | `http://localhost:5188` | — |
-| Prowlarr | `http://localhost:9696` | `http://prowlarr:9696/` |
 | qBittorrent | `http://localhost:8081` | `http://qbittorrent:8080/` |
 
-首次启动后，在 Prowlarr 配置索引，从“设置 → 常规”复制其 API Key；在 qBittorrent 设置 Web UI 用户名和密码。LinuxServer 镜像的 qBittorrent 首次临时密码可从其容器日志查看，随后在 Web UI 修改。将这些信息填入映库的「来源与密钥 → 磁力资源索引与 BT 下载器」，保存后分别测试。配套服务的下载器保存根目录填写 `/downloads`，和本系统使用同一个宿主机下载目录。接入宿主机上的服务时，容器通常通过 `host.docker.internal` 加实际端口访问；不要填写容器自身的 `localhost`。
+首次启动后，在 qBittorrent 设置 Web UI 用户名和密码。LinuxServer 镜像的 qBittorrent 首次临时密码可从其容器日志查看，随后在 Web UI 修改。将下载器信息填入映库的「来源与密钥 → 磁力资源索引与 BT 下载器」，保存后分别测试 Knaben 和 qBittorrent。配套服务的下载器保存根目录填写 `/downloads`，和本系统使用同一个宿主机下载目录。接入宿主机上的服务时，容器通常通过 `host.docker.internal` 加实际端口访问；不要填写容器自身的 `localhost`。
 
 对单部电影点击「搜索 4K 中字磁力」，候选按片名/年份匹配、4K、中字和做种数排序，再选择加入队列。资源名称中的 `4K` / `2160p` 用于识别画质，`CHS` / `CHT` / 中字 / 简中 / 繁中用于识别字幕；国语或 Mandarin 音轨不会当作中文字幕。界面会标明名称标签未经实际文件验证。索引仅返回 `.torrent` 下载地址而没有磁力或 BTIH 时，不会猜测资源哈希。
 
@@ -32,9 +31,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\update-local.ps1 -
 
 BT 和 HTTP 任务使用同一持久化任务列表和并发上限，BT 状态与进度取自下载器。支持暂停、继续、取消与手动重试；提交网络失败按原有重试设置退避重试。取消 BT 任务保留下载文件，清理历史不会删除文件。下载完成后，qBittorrent 仍可能按其自身设置继续做种。若下载器已有相同资源但位于不同目录，系统会提示核对目录，不会把它误报为已保存到新位置。
 
-新增接口：`POST /api/media/{id}/magnets`、`POST /api/sync/latest/download`；`POST /api/search` 可传 `source=tmdb, type=movie, mode=latest`。资料同步不自动下载；明确的批量下载按钮或选择资源入队才会开始 BT 下载。资源索引 Key 和下载器密码沿用加密配置与管理员访问控制。
+新增接口：`POST /api/media/{id}/magnets`、`POST /api/sync/latest/download`；`POST /api/search` 可传 `source=tmdb, type=movie, mode=latest`。资料同步不自动下载；明确的批量下载按钮或选择资源入队才会开始 BT 下载。下载器密码沿用加密配置与管理员访问控制。
 
-配套镜像与 API 参考：[LinuxServer qBittorrent](https://docs.linuxserver.io/images/docker-qbittorrent/)、[LinuxServer Prowlarr](https://docs.linuxserver.io/images/docker-prowlarr/)、[qBittorrent Web UI API](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29)、[TMDB Discover](https://developer.themoviedb.org/reference/discover-movie)。
+配套镜像与 API 参考：[Knaben API](https://knaben.org/api/v2/)、[LinuxServer qBittorrent](https://docs.linuxserver.io/images/docker-qbittorrent/)、[qBittorrent Web UI API](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29)、[TMDB Discover](https://developer.themoviedb.org/reference/discover-movie)。
 
 ### 网页配置 TMDB / IMDb 密钥
 
@@ -85,7 +84,7 @@ IMDb 数据限个人及非商业用途。查询会流式扫描文件，超过 65
 
 每项结果显示评分来源及人数（来源提供时）。Internet Archive 的用户评分由 5 分制折算为 10 分制，不能视为 IMDb / 豆瓣评分；不同来源的同名条目独立保留。检索结果合并进共享资源库（最多 1000 项），可在「内容比较」中选择最多四项比较。搜索和元数据读取不会自动开始下载。文件列表过滤私有文件、受限项目和危险路径，并展示来源标注的许可信息，实际下载仍受来源可访问性影响。
 
-联网请求沿用现有代理配置，明确允许 `archive.org`、`api.themoviedb.org`、`www.omdbapi.com` 与 `api-fulfill.dataexchange.us-east-1.amazonaws.com`。更换代理后可通过 `CINEVAULT_SOURCE_PROXY` 设置；留空则使用公共 DNS 直连。带认证头的 API 请求不跟随重定向；下载文件重定向仍执行原有公共地址与下载检查。
+联网请求沿用现有代理配置，明确允许 `archive.org`、`api.themoviedb.org`、`api.knaben.org`、`www.omdbapi.com` 与 `api-fulfill.dataexchange.us-east-1.amazonaws.com`。更换代理后可通过 `CINEVAULT_SOURCE_PROXY` 设置；留空则使用公共 DNS 直连。带认证头的 API 请求不跟随重定向；下载文件重定向仍执行原有公共地址与下载检查。
 
 新增登录保护 API：`GET /api/sources`、`POST /api/search`、`POST /api/resources/archive/{identifier}`。修改请求继续要求 CSRF 令牌。API Key 不出现在配置状态接口、搜索响应或错误文本中。
 
@@ -240,14 +239,14 @@ dotnet build tests/CineVault.Checks.csproj
 dotnet tests/bin/Debug/net10.0/CineVault.Checks.dll
 ```
 
-当前功能已在 .NET 8 兼容目标中通过 116 项 C# 检查，并通过 9 项前端检查。生产目标为 .NET 10；兼容目标的验证命令如下：
+生产目标为 .NET 10；也可使用以下命令在 .NET 8 兼容目标中运行 C# 检查：
 
 ```powershell
 dotnet build tests/CineVault.Checks.csproj -p:CineVaultFramework=net8.0
 dotnet tests/bin/Debug/net8.0/CineVault.Checks.dll
 ```
 
-C# 检查使用受控 HTTP 响应和实际文件写入，覆盖电影日期排序、密钥保存与切换、资源名称匹配、4K 与中文字幕识别、Prowlarr / qBittorrent 协议、批量下载条件、HTTP/BT 共享并发、失败重试、暂停续传、取消清理、队列恢复和目录/地址约束。前端检查覆盖首次同步、最新电影筛选、候选显示与文本转义。这些检查不等同于真实来源或下载器联通成功。
+C# 检查使用受控 HTTP 响应和实际文件写入，覆盖电影日期排序、密钥保存与切换、资源名称匹配、4K 与中文字幕识别、Knaben / qBittorrent 协议、批量下载条件、HTTP/BT 共享并发、失败重试、暂停续传、取消清理、队列恢复和目录/地址约束。前端检查覆盖首次同步、最新电影筛选、候选显示与文本转义。这些检查不等同于真实来源或下载器联通成功。
 
 账户功能曾通过 32 项集成检查、3 项容器重建数据检查，并确认旧会话可跨容器重建继续使用。`tests/auth-smoke.py` 覆盖登录、权限、CSRF、密码变更、停用、锁定与数据持久化，应仅对一次性测试容器运行。最新 BT 功能尚需在配置真实索引与下载器后做端到端验证。
 
@@ -269,7 +268,7 @@ python scripts/package-source.py
 
 ## 当前源站网络兼容配置
 
-Docker Desktop 环境默认通过 CINEVAULT_SOURCE_PROXY=http://http.docker.internal:3128 请求明确配置的 Network:ProxyHosts（www.gying.net、gying.net）。其他域名及下载地址继续使用公网地址检查。代理配置来自本地服务端配置，网页不能修改该允许列表。
+Docker Desktop 环境默认通过 CINEVAULT_SOURCE_PROXY=http://http.docker.internal:3128 请求 compose.yaml 的 Network:ProxyHosts 列出的域名，包括 TMDB 和 Knaben。其他域名及下载地址继续使用公网地址检查。代理配置来自本地服务端配置，网页不能修改该允许列表。
 
 如宿主机没有 Docker Desktop 代理，可在 .env 中将 CINEVAULT_SOURCE_PROXY 设为空，或填写可用的 HTTP/HTTPS 代理地址，再运行 docker compose up -d --force-recreate。更换 Crawler:BaseUrl 时也应同步检查 Network:ProxyHosts。
 

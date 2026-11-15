@@ -37,16 +37,26 @@ static class TorrentChecks
         check(TorrentReleaseRules.ParseMagnet("magnet:?xt=urn:btih:"+new string('A',32)).Hash == new string('0',40), "base32 BTIH hashes normalize to canonical hexadecimal");
         var clean = TorrentReleaseRules.ParseMagnet(magnet + "&ws=http%3A%2F%2F169.254.169.254&tr=http%3A%2F%2F127.0.0.1%2Fannounce").Magnet;
         check(!clean.Contains("169.254") && !clean.Contains("127.0.0.1"), "untrusted webseed and private tracker targets are not forwarded");
-        using var handler = new ResourceFixtureHandler(); var gateway = new ResourceGateway(settings, handler);
+        settings.SaveBt(new() { ResourceIndexUrl = "", ClearResourceIndexKey = true, QbitUrl = "http://qbittorrent:8080/", QbitUserName = "admin", QbitSaveRoot = "/downloads" });
+        var web = new KnabenFixtureWeb();
+        using var handler = new ResourceFixtureHandler(); var gateway = new ResourceGateway(settings, web, handler);
         var found = await gateway.Search(movie, CancellationToken.None);
-        check(found.Length == 1 && found[0].Is4K && found[0].HasChineseSubtitles && handler.SawIndexKey, "Prowlarr queries its configured indexes using a header key and returns ranked magnet candidates");
+        check(found.Length == 1 && found[0].Is4K && found[0].HasChineseSubtitles && found[0].Seeders == 10 && found[0].Size == 1024 && web.SawCorrectRequest, "Knaben searches without Prowlarr credentials and returns valid ranked magnet candidates");
         await gateway.Add(magnet, "/downloads/Movies", CancellationToken.None);
         check(handler.LastForm.ContainsKey("urls") && handler.LastForm["savepath"] == "/downloads/Movies" && handler.LoginCount == 1, "qBittorrent authenticates and receives the magnet plus explicit save directory");
         var status = await gateway.Status([hash], CancellationToken.None);
         check(status.Length == 1 && status[0].State == "downloading" && status[0].Downloaded == 50, "qBittorrent progress is read from its real API schema");
         await gateway.Control(hash, "cancel", CancellationToken.None);
         check(handler.LastForm["deleteFiles"] == "false", "cancelling a BT task preserves downloaded files");
-        check((await gateway.Test("indexer", CancellationToken.None)).Success && (await gateway.Test("qbittorrent", CancellationToken.None)).Success, "index and downloader connection tests validate the configured services");
+        check((await gateway.Test("indexer", CancellationToken.None)).Success && (await gateway.Test("qbittorrent", CancellationToken.None)).Success, "resource engine and downloader connection tests validate their services");
+        web.Malformed = true;
+        var badResponse = false; try { await gateway.Search(movie, CancellationToken.None); } catch (InvalidDataException) { badResponse = true; }
+        check(badResponse && !(await gateway.Test("indexer", CancellationToken.None)).Success, "malformed Knaben responses do not appear as successful empty searches");
+        web.Malformed = false;
+        web.Timeout = true;
+        var timedOut = false; try { await gateway.Search(movie, CancellationToken.None); } catch (HttpRequestException) { timedOut = true; }
+        check(timedOut, "resource engine timeouts are reported as source failures");
+        web.Timeout = false;
         var store = new StateStore(Path.Combine(dir, "state")); store.SetCatalogue(new([movie], DateTimeOffset.UtcNow));
         store.SetSettings(store.Settings with { Concurrency = 1, AutoRetry = false });
         var fixture = new TorrentFixtureGateway();
@@ -96,6 +106,21 @@ static class TorrentChecks
         check(outcome.GetProperty("status").GetString()=="Queued" && store.Job(outcome.GetProperty("taskId").GetString()!)?.InfoHash==fixture.SearchHash, "batch mode queues the best matching 4K Chinese release as a real persisted BT task");
         var oversized=false;try{await controller.Sync(new(Limit:4),CancellationToken.None);}catch(ArgumentException){oversized=true;}
         check(oversized,"batch download request cannot exceed the three-movie limit");
+    }
+}
+
+sealed class KnabenFixtureWeb : IPublicWebClient
+{
+    public bool SawCorrectRequest, Malformed, Timeout;
+    public Task<HttpResponseMessage> SendAsync(Uri uri, CancellationToken ct, long? range = null, string? validator = null) => throw new NotSupportedException();
+    public Task<HttpResponseMessage> SendApiAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        if (Timeout) throw new OperationCanceledException();
+        SawCorrectRequest = request.Method == HttpMethod.Get && request.RequestUri!.Host == "api.knaben.org" &&
+            request.RequestUri.AbsolutePath == "/v2/search" && request.RequestUri.Query.Contains("q=") &&
+            !request.RequestUri.Query.Contains("xxx") && !request.RequestUri.Query.Contains("unsafe") && !request.Headers.Contains("X-Api-Key");
+        var body = Malformed ? "{\"hits\":null}" : "{\"hits\":[{\"title\":\"Fixture.Movie.2025.2160p.CHS\",\"hash\":\"0123456789abcdef0123456789abcdef01234567\",\"seeders\":10,\"bytes\":1024,\"tracker\":\"Fixture\"},{\"title\":\"Fixture.Movie.2025.2160p.CHS\",\"hash\":\"invalid\"}]}";
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
     }
 }
 

@@ -123,7 +123,7 @@ public sealed class SourceSettingsStore
     }
     public void SaveBt(BtSettingsInput input)
     {
-        var indexUrl = ServiceUrl(input.ResourceIndexUrl); var qbitUrl = ServiceUrl(input.QbitUrl);
+        var indexUrl = input.ResourceIndexUrl is null ? null : ServiceUrl(input.ResourceIndexUrl); var qbitUrl = ServiceUrl(input.QbitUrl);
         var root = input.QbitSaveRoot?.Trim().Replace('\\', '/') ?? "";
         if (root.Length is 0 or > 500 || !(root.StartsWith('/') || System.Text.RegularExpressions.Regex.IsMatch(root, "^[A-Za-z]:/")) || root.Split('/').Any(x => x is "." or "..") || root.Any(char.IsControl))
             throw new ArgumentException("请填写 BT 下载器的绝对保存根目录，路径不能包含 . 或 ..。");
@@ -132,7 +132,7 @@ public sealed class SourceSettingsStore
         if (input.QbitPassword?.Length > 512 || input.QbitPassword?.Any(char.IsControl) == true) throw new ArgumentException("下载器密码格式不正确。");
         lock (gate)
         {
-            var next = saved.Snapshot(); next.ResourceIndexUrl = indexUrl; next.QbitUrl = qbitUrl; next.QbitUserName = user; next.QbitSaveRoot = root;
+            var next = saved.Snapshot(); if (indexUrl is not null) next.ResourceIndexUrl = indexUrl; next.QbitUrl = qbitUrl; next.QbitUserName = user; next.QbitSaveRoot = root;
             next.ResourceIndexKey = input.ClearResourceIndexKey ? "" : Secret(input.ResourceIndexKey, next.ResourceIndexKey, "Prowlarr API Key");
             next.QbitPassword = input.ClearQbitPassword ? "" : string.IsNullOrEmpty(input.QbitPassword) ? next.QbitPassword : input.QbitPassword;
             Persist(next);

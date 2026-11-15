@@ -47,21 +47,17 @@
 </div>
 <section class="panel source-config-card" style="margin-top:24px">
 <h2>磁力资源索引与 BT 下载器</h2>
-<p class="muted">Prowlarr 查询你已启用的网上资源索引，qBittorrent 执行磁力下载。优先识别 4K / 2160p 和 CHS / CHT / 中字；这些标签来自资源名称，尚未验证文件内字幕。</p>
+<p class="muted">使用 Knaben 在线资源引擎搜索，无需配置索引器和 API Key；qBittorrent 执行磁力下载。优先识别 4K / 2160p 和 CHS / CHT / 中字；这些标签来自资源名称，尚未验证文件内字幕。</p>
 <form method="post" action="/admin/sources/bt">@Html.AntiForgeryToken()
 <div class="source-aws-grid"><div>
-<label class="form-field"><span>Prowlarr 服务地址</span><input name="ResourceIndexUrl" type="url" value="@Model.ResourceIndexUrl" placeholder="http://prowlarr:9696/" maxlength="512"><small>填写电影服务容器可以访问的地址；已安装在宿主机上时可使用 host.docker.internal。</small></label>
-<label class="form-field"><span>Prowlarr API Key · @(Model.HasResourceIndexKey ? "已保存" : "未配置")</span><input name="ResourceIndexKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="留空保留已有 Key"><small>在 Prowlarr 的设置 → 常规查看 API Key，并先添加、启用可用索引。</small></label>
-<label class="source-clear"><input type="checkbox" name="ClearResourceIndexKey" value="true">清除资源索引密钥</label>
-</div><div>
 <label class="form-field"><span>qBittorrent Web UI 地址</span><input name="QbitUrl" type="url" value="@Model.QbitUrl" placeholder="http://qbittorrent:8080/" maxlength="512"></label>
 <label class="form-field"><span>Web UI 用户名</span><input name="QbitUserName" value="@Model.QbitUserName" maxlength="120" autocomplete="username"></label>
 <label class="form-field"><span>Web UI 密码 · @(Model.HasQbitPassword ? "已保存" : "未配置")</span><input name="QbitPassword" type="password" maxlength="512" autocomplete="new-password" placeholder="留空保留已有密码"></label>
 <label class="form-field"><span>下载器的保存根目录</span><input name="QbitSaveRoot" value="@Model.QbitSaveRoot" required maxlength="500"><small>配套 Docker 服务使用 /downloads，映射到与本系统相同的宿主机下载目录。</small></label>
 <label class="source-clear"><input type="checkbox" name="ClearQbitPassword" value="true">清除下载器密码</label>
-</div></div><button class="btn primary" type="submit">保存资源与下载器配置</button>
+</div></div><button class="btn primary" type="submit">保存下载器配置</button>
 </form>
-<div class="source-aws-grid"><form class="source-test" method="post" action="/admin/sources/test/indexer">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 Prowlarr 索引</button></form><form class="source-test" method="post" action="/admin/sources/test/qbittorrent">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 qBittorrent</button></form></div>
+<div class="source-aws-grid"><form class="source-test" method="post" action="/admin/sources/test/indexer">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 Knaben 资源引擎</button></form><form class="source-test" method="post" action="/admin/sources/test/qbittorrent">@Html.AntiForgeryToken()<button class="btn" type="submit">测试 qBittorrent</button></form></div>
 <p class="account-hint">批量操作每次最多检查 3 部最新电影；只自动提交片名、年份匹配，标有 4K 与中文字幕，且报告有做种者的候选。未匹配到的影片会跳过并显示原因。取消 BT 任务保留已下载的文件。</p>
 </section>
 <script type="module" src="/source-settings.js"></script>
